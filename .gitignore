@@ -49,3 +49,9 @@ CMakeFiles/*
 # Ai helperfilers
 **/[cC]laude.[mM][dD]
 **/CLAUDE.[mM][dD]
+
+# added by daily-work-log
+logs/
+*.log
+frontend/build/
+.last_build_id

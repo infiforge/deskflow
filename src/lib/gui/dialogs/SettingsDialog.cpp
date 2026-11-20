@@ -21,8 +21,23 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QStringList>
 
 using namespace deskflow::gui;
+
+namespace {
+
+//! Map a stored capture source to the Audio tab combo index. Unknown values
+//! fall back to Auto, which is index 0.
+int audioSourceIndex(const QString &source)
+{
+  static const QStringList sources{QStringLiteral("auto"), QStringLiteral("system"), QStringLiteral("microphone"),
+                                   QStringLiteral("device")};
+  const int index = sources.indexOf(source.trimmed().toLower());
+  return index < 0 ? 0 : index;
+}
+
+} // namespace
 
 SettingsDialog::SettingsDialog(QWidget *parent, const ServerConfig &serverConfig)
     : QDialog(parent),
@@ -34,6 +49,13 @@ SettingsDialog::SettingsDialog(QWidget *parent, const ServerConfig &serverConfig
   ui->setupUi(this);
   layout()->addWidget(m_buttonBox);
   ui->tabWidget->setCurrentIndex(0);
+
+  // Item data uses the same stable values that AudioConfig reads from
+  // audio/source. Keep the order aligned with the combo entries in the .ui file.
+  ui->comboAudioSource->setItemData(0, QStringLiteral("auto"));
+  ui->comboAudioSource->setItemData(1, QStringLiteral("system"));
+  ui->comboAudioSource->setItemData(2, QStringLiteral("microphone"));
+  ui->comboAudioSource->setItemData(3, QStringLiteral("device"));
 
   // these are enabled by the control next to them
   ui->lineCommandEnter->setEnabled(false);
@@ -106,6 +128,7 @@ void SettingsDialog::initConnections() const
 
   connect(ui->groupSecurity, &QGroupBox::toggled, this, &SettingsDialog::updateTlsControlsEnabled);
   connect(ui->groupService, &QGroupBox::toggled, this, &SettingsDialog::updateControls);
+  connect(ui->groupAudio, &QGroupBox::toggled, this, &SettingsDialog::updateAudioControls);
   connect(ui->btnClearAllSettings, &QPushButton::clicked, this, &SettingsDialog::resetAllSettings);
   connect(ui->btnTlsRegenCert, &QPushButton::clicked, this, &SettingsDialog::regenCertificates);
   connect(ui->comboTlsKeyLength, &QComboBox::currentIndexChanged, this, &SettingsDialog::updateRequestedKeySize);
@@ -142,6 +165,12 @@ void SettingsDialog::initConnections() const
   connect(ui->cbRunExitCommand, &QCheckBox::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
   connect(ui->lineCommandEnter, &QLineEdit::textChanged, this, &SettingsDialog::setButtonBoxEnabledButtons);
   connect(ui->lineCommandExit, &QLineEdit::textChanged, this, &SettingsDialog::setButtonBoxEnabledButtons);
+  connect(ui->groupAudio, &QGroupBox::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
+  connect(ui->comboAudioSource, &QComboBox::currentIndexChanged, this, &SettingsDialog::setButtonBoxEnabledButtons);
+  connect(ui->lineAudioCaptureDevice, &QLineEdit::textChanged, this, &SettingsDialog::setButtonBoxEnabledButtons);
+  connect(ui->lineAudioPlaybackDevice, &QLineEdit::textChanged, this, &SettingsDialog::setButtonBoxEnabledButtons);
+  connect(ui->sbAudioBitrate, &QSpinBox::valueChanged, this, &SettingsDialog::setButtonBoxEnabledButtons);
+  connect(ui->cbAudioFollowFocus, &QCheckBox::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
   connect(Settings::instance(), &Settings::settingsWritableChanged, this, &SettingsDialog::updateControls);
 }
 
@@ -242,6 +271,12 @@ void SettingsDialog::accept()
   Settings::setValue(Settings::Core::EnableExitCommand, ui->cbRunExitCommand->isChecked());
   Settings::setValue(Settings::Core::ComputerEnterCommand, ui->lineCommandEnter->text());
   Settings::setValue(Settings::Core::ComputerExitCommand, ui->lineCommandExit->text());
+  Settings::setValue(Settings::Audio::Enabled, ui->groupAudio->isChecked());
+  Settings::setValue(Settings::Audio::Source, ui->comboAudioSource->currentData().toString());
+  Settings::setValue(Settings::Audio::CaptureDevice, ui->lineAudioCaptureDevice->text());
+  Settings::setValue(Settings::Audio::PlaybackDevice, ui->lineAudioPlaybackDevice->text());
+  Settings::setValue(Settings::Audio::Bitrate, ui->sbAudioBitrate->value());
+  Settings::setValue(Settings::Audio::FollowFocus, ui->cbAudioFollowFocus->isChecked());
 
   Settings::ProcessMode mode;
   if (ui->groupService->isChecked())
@@ -270,6 +305,13 @@ void SettingsDialog::loadFromConfig()
   ui->cbRunExitCommand->setChecked(Settings::value(Settings::Core::EnableExitCommand).toBool());
   ui->lineCommandEnter->setText(Settings::value(Settings::Core::ComputerEnterCommand).toString());
   ui->lineCommandExit->setText(Settings::value(Settings::Core::ComputerExitCommand).toString());
+
+  ui->groupAudio->setChecked(Settings::value(Settings::Audio::Enabled).toBool());
+  ui->comboAudioSource->setCurrentIndex(audioSourceIndex(Settings::value(Settings::Audio::Source).toString()));
+  ui->lineAudioCaptureDevice->setText(Settings::value(Settings::Audio::CaptureDevice).toString());
+  ui->lineAudioPlaybackDevice->setText(Settings::value(Settings::Audio::PlaybackDevice).toString());
+  ui->sbAudioBitrate->setValue(Settings::value(Settings::Audio::Bitrate).toInt());
+  ui->cbAudioFollowFocus->setChecked(Settings::value(Settings::Audio::FollowFocus).toBool());
 
   const auto processMode = Settings::value(Settings::Core::ProcessMode).value<Settings::ProcessMode>();
   ui->groupService->setChecked(processMode == Settings::ProcessMode::Service);
@@ -390,6 +432,7 @@ void SettingsDialog::updateControls()
   ui->cbRunExitCommand->setEnabled(writable);
   ui->lineCommandEnter->setEnabled(writable && ui->cbRunEnterCommand->isChecked());
   ui->lineCommandExit->setEnabled(writable && ui->cbRunExitCommand->isChecked());
+  ui->groupAudio->setEnabled(writable);
 
   // Portable mode only ever applies to Windows.
   // Daemon options should only be available on Windows when *not* in portable mode.
@@ -403,6 +446,18 @@ void SettingsDialog::updateControls()
   ui->widgetLogFilename->setEnabled(writable && logToFile);
 
   updateTlsControls();
+  updateAudioControls();
+}
+
+void SettingsDialog::updateAudioControls() const
+{
+  const bool enabled = Settings::isWritable() && ui->groupAudio->isChecked();
+  ui->comboAudioSource->setEnabled(enabled);
+  ui->lineAudioCaptureDevice->setEnabled(enabled);
+  ui->lineAudioPlaybackDevice->setEnabled(enabled);
+  ui->sbAudioBitrate->setEnabled(enabled);
+  ui->cbAudioFollowFocus->setEnabled(enabled);
+  ui->lblAudioNote->setEnabled(enabled);
 }
 
 void SettingsDialog::updateRequestedKeySize() const
@@ -444,6 +499,12 @@ bool SettingsDialog::isModified() const
       (ui->cbRunExitCommand->isChecked() != Settings::value(Settings::Core::EnableExitCommand).toBool()) ||
       (ui->lineCommandEnter->text() != Settings::value(Settings::Core::ComputerEnterCommand).toString()) ||
       (ui->lineCommandExit->text() != Settings::value(Settings::Core::ComputerExitCommand).toString()) ||
+      (ui->groupAudio->isChecked() != Settings::value(Settings::Audio::Enabled).toBool()) ||
+      (ui->comboAudioSource->currentData().toString() != Settings::value(Settings::Audio::Source).toString()) ||
+      (ui->lineAudioCaptureDevice->text() != Settings::value(Settings::Audio::CaptureDevice).toString()) ||
+      (ui->lineAudioPlaybackDevice->text() != Settings::value(Settings::Audio::PlaybackDevice).toString()) ||
+      (ui->sbAudioBitrate->value() != Settings::value(Settings::Audio::Bitrate).toInt()) ||
+      (ui->cbAudioFollowFocus->isChecked() != Settings::value(Settings::Audio::FollowFocus).toBool()) ||
       (I18N::nativeTo639Name(ui->comboLanguage->currentText()) != Settings::value(Settings::Core::Language).toString());
 
   if (!ignoreInterface)
@@ -480,6 +541,13 @@ bool SettingsDialog::isDefault() const
       (ui->lineCommandExit->text() == Settings::defaultValue(Settings::Core::ComputerExitCommand).toString()) &&
       (ui->cbRunEnterCommand->isChecked() == Settings::defaultValue(Settings::Core::EnableEnterCommand).toBool()) &&
       (ui->cbRunExitCommand->isChecked() == Settings::defaultValue(Settings::Core::EnableExitCommand).toBool()) &&
+      (ui->groupAudio->isChecked() == Settings::defaultValue(Settings::Audio::Enabled).toBool()) &&
+      (ui->comboAudioSource->currentData().toString() ==
+       Settings::defaultValue(Settings::Audio::Source).toString()) &&
+      (ui->lineAudioCaptureDevice->text() == Settings::defaultValue(Settings::Audio::CaptureDevice).toString()) &&
+      (ui->lineAudioPlaybackDevice->text() == Settings::defaultValue(Settings::Audio::PlaybackDevice).toString()) &&
+      (ui->sbAudioBitrate->value() == Settings::defaultValue(Settings::Audio::Bitrate).toInt()) &&
+      (ui->cbAudioFollowFocus->isChecked() == Settings::defaultValue(Settings::Audio::FollowFocus).toBool()) &&
       (ui->comboLanguage->currentText() == "English")
   );
 }
@@ -501,6 +569,13 @@ void SettingsDialog::resetToDefault()
   ui->cbRunExitCommand->setChecked(Settings::defaultValue(Settings::Core::EnableExitCommand).toBool());
   ui->lineCommandEnter->setText(Settings::defaultValue(Settings::Core::ComputerEnterCommand).toString());
   ui->lineCommandExit->setText(Settings::defaultValue(Settings::Core::ComputerExitCommand).toString());
+
+  ui->groupAudio->setChecked(Settings::defaultValue(Settings::Audio::Enabled).toBool());
+  ui->comboAudioSource->setCurrentIndex(audioSourceIndex(Settings::defaultValue(Settings::Audio::Source).toString()));
+  ui->lineAudioCaptureDevice->setText(Settings::defaultValue(Settings::Audio::CaptureDevice).toString());
+  ui->lineAudioPlaybackDevice->setText(Settings::defaultValue(Settings::Audio::PlaybackDevice).toString());
+  ui->sbAudioBitrate->setValue(Settings::defaultValue(Settings::Audio::Bitrate).toInt());
+  ui->cbAudioFollowFocus->setChecked(Settings::defaultValue(Settings::Audio::FollowFocus).toBool());
 
   const auto autoHide = Settings::defaultValue(Settings::Gui::Autohide).toBool();
   ui->rbCloseToTray->setChecked(autoHide);

@@ -743,6 +743,162 @@
        </item>
       </layout>
      </widget>
+     <widget class="QWidget" name="tabAudio">
+      <attribute name="title">
+       <string>&amp;Audio</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayoutAudio">
+       <property name="spacing">
+        <number>9</number>
+       </property>
+       <property name="leftMargin">
+        <number>12</number>
+       </property>
+       <property name="topMargin">
+        <number>12</number>
+       </property>
+       <property name="rightMargin">
+        <number>12</number>
+       </property>
+       <property name="bottomMargin">
+        <number>12</number>
+       </property>
+       <item>
+        <widget class="QGroupBox" name="groupAudio">
+         <property name="title">
+          <string>Enable audio forwarding</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayoutAudioGroup">
+          <item>
+           <layout class="QFormLayout" name="formAudio">
+            <item row="0" column="0">
+             <widget class="QLabel" name="lblAudioSource">
+              <property name="text">
+               <string>Capture source</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QComboBox" name="comboAudioSource">
+              <item>
+               <property name="text">
+                <string>Auto (system audio)</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>System audio</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>Microphone</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>Named device</string>
+               </property>
+              </item>
+             </widget>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="lblAudioCaptureDevice">
+              <property name="text">
+               <string>Capture device</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QLineEdit" name="lineAudioCaptureDevice">
+              <property name="placeholderText">
+               <string>Optional device name</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="0">
+             <widget class="QLabel" name="lblAudioPlaybackDevice">
+              <property name="text">
+               <string>Playback device</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QLineEdit" name="lineAudioPlaybackDevice">
+              <property name="placeholderText">
+               <string>Default output device</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="0">
+             <widget class="QLabel" name="lblAudioBitrate">
+              <property name="text">
+               <string>Bitrate</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="1">
+             <widget class="QSpinBox" name="sbAudioBitrate">
+              <property name="suffix">
+               <string> bps</string>
+              </property>
+              <property name="minimum">
+               <number>6000</number>
+              </property>
+              <property name="maximum">
+               <number>512000</number>
+              </property>
+              <property name="singleStep">
+               <number>1000</number>
+              </property>
+              <property name="value">
+               <number>64000</number>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="cbAudioFollowFocus">
+            <property name="text">
+             <string>Forward audio only from the focused client</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lblAudioNote">
+            <property name="text">
+             <string>Audio forwarding requires this build on both the server and the client. System audio capture uses WASAPI loopback on Windows and a PulseAudio or PipeWire monitor on Linux. On macOS, select a virtual loopback input device.</string>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="verticalSpacerAudio">
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>0</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
      <widget class="QWidget" name="tabAdvanced">
       <attribute name="title">
        <string>&amp;Advanced</string>

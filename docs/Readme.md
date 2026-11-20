@@ -2,7 +2,7 @@
 
 Deskflow is a free and open source keyboard and mouse sharing app. Use the keyboard, mouse, or trackpad of one computer to control nearby computers, and work seamlessly between them.
 
-This fork adds cross-platform audio forwarding. A client captures its system audio or a selected input device and sends it to the computer acting as the server, which plays it through its selected output device. By default audio follows the pointer, so only the focused client sends audio. The capture source, output device, bitrate, and focus behaviour are configurable; see [Configuration](Configuration.md#audio).
+This fork adds cross-platform audio forwarding. A client captures its system audio or a selected input device and sends it to the computer acting as the server, which plays it through its selected output device. By default audio follows the pointer, so only the focused client sends audio. You can enable or disable the feature and set the capture source, devices, bitrate, and focus behaviour in **Edit > Preferences > Audio**; see [Configuration](Configuration.md#audio).
 
 Audio forwarding uses protocol messages that upstream Deskflow does not recognise, so both the server and the client must run this fork. Set `enabled` to `false` on the server when connecting an unpatched client.
 

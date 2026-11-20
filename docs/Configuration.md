@@ -48,6 +48,8 @@ option=value
 
 This section controls audio forwarding. It begins with `[audio]`. Audio forwarding is enabled by default.
 
+You can also set these options in the GUI. Open **Edit > Preferences** and select the **Audio** tab to turn forwarding on or off, choose a capture source, set capture and playback devices, change the bitrate, and control whether audio follows the focused client. Environment variables still take precedence over values saved through the GUI.
+
 | Option          | Valid Values | Description |
 |:----------------|:------------:|:-----------|
 | enabled         | `true` or `false` | Enable audio forwarding [default: true] |

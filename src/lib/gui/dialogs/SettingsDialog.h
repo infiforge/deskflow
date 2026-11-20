@@ -54,6 +54,9 @@ private:
   /// @brief Enables controls when they should be.
   void updateControls();
 
+  /// @brief Enables audio controls when forwarding is enabled and settings are writable.
+  void updateAudioControls() const;
+
   /// @brief updates the setting vaule for key size.
   void updateRequestedKeySize() const;
 

@@ -1297,6 +1297,66 @@ Enabling this setting will disable the server config GUI.</source>
         <source>Remove all settings</source>
         <translation>すべての設定を消去する</translation>
     </message>
+    <message>
+        <source>&amp;Audio</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable audio forwarding</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Capture source</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Auto (system audio)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>System audio</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Microphone</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Named device</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Capture device</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Optional device name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Playback device</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Default output device</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bitrate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> bps</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Forward audio only from the focused client</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Audio forwarding requires this build on both the server and the client. System audio capture uses WASAPI loopback on Windows and a PulseAudio or PipeWire monitor on Linux. On macOS, select a virtual loopback input device.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialogButtonBox</name>
