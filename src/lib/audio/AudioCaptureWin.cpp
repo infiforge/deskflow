@@ -9,8 +9,6 @@
 
 #include "base/Log.h"
 
-// Instantiate the WASAPI COM interface GUIDs in this translation unit.
-#define INITGUID
 #include <windows.h>
 #include <audioclient.h>
 #include <ksmedia.h>
@@ -109,7 +107,7 @@ public:
     m_comInitialized = SUCCEEDED(hr);
 
     IMMDeviceEnumerator *enumerator = nullptr;
-    hr = CoCreateInstance(CLSID_MMDeviceEnumerator, nullptr, CLSCTX_ALL, IID_IMMDeviceEnumerator,
+    hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator),
                           reinterpret_cast<void **>(&enumerator));
     if (FAILED(hr)) {
       LOG_ERR("failed to create WASAPI device enumerator: 0x%08lx", hr);
@@ -124,7 +122,7 @@ public:
       return false;
     }
 
-    hr = device->Activate(IID_IAudioClient, CLSCTX_ALL, nullptr, reinterpret_cast<void **>(&m_client));
+    hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, reinterpret_cast<void **>(&m_client));
     device->Release();
     if (FAILED(hr)) {
       LOG_ERR("failed to activate WASAPI audio client: 0x%08lx", hr);
@@ -144,7 +142,7 @@ public:
       return false;
     }
 
-    hr = m_client->GetService(IID_IAudioCaptureClient, reinterpret_cast<void **>(&m_captureClient));
+    hr = m_client->GetService(__uuidof(IAudioCaptureClient), reinterpret_cast<void **>(&m_captureClient));
     if (FAILED(hr)) {
       LOG_ERR("failed to get WASAPI capture client: 0x%08lx", hr);
       return false;
