@@ -84,7 +84,7 @@ endif()
 #generate vcpkg file if needed
 if(WIN32)
     if(VCPKG_QT)
-        set(QT_LIBS ", \"qttranslations\", \"qtsvg\", \"qt6-multimedia\"")
+        set(QT_LIBS ", \"qttranslations\", \"qtsvg\", \"qtmultimedia\"")
     endif()
     configure_file(cmake/vcpkg.json.in ${CMAKE_SOURCE_DIR}/vcpkg.json @ONLY)
 endif()
