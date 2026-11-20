@@ -9,6 +9,8 @@
 
 #include "base/Log.h"
 
+// Instantiate the WASAPI COM interface GUIDs in this translation unit.
+#define INITGUID
 #include <windows.h>
 #include <audioclient.h>
 #include <ksmedia.h>
