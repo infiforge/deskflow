@@ -65,6 +65,8 @@ protected:
   virtual ConnectionResult parseMessage(const uint8_t *code);
   void keyDown(uint16_t id, uint16_t mask, uint16_t button, const std::string &lang);
   void keyRepeat(uint16_t id, uint16_t mask, uint16_t count, uint16_t button, const std::string &lang);
+  void audioStart();
+  void audioStop();
 
   deskflow::IStream *getStream() const
   {

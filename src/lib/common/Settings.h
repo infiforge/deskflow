@@ -47,6 +47,15 @@ public:
     inline static const auto XdpClipboardRetried = QStringLiteral("client/xdpClipboardRetried");
     inline static const auto XdpRestoreToken = QStringLiteral("client/xdpRestoreToken");
   };
+  struct Audio
+  {
+    inline static const auto Enabled = QStringLiteral("audio/enabled");
+    inline static const auto Source = QStringLiteral("audio/source");
+    inline static const auto CaptureDevice = QStringLiteral("audio/captureDevice");
+    inline static const auto PlaybackDevice = QStringLiteral("audio/playbackDevice");
+    inline static const auto Bitrate = QStringLiteral("audio/bitrate");
+    inline static const auto FollowFocus = QStringLiteral("audio/followFocus");
+  };
   struct Core
   {
     inline static const auto CoreMode = QStringLiteral("core/coreMode");
@@ -263,7 +272,8 @@ private:
 
   // clang-format off
   inline static const QStringList m_validGroup = {
-      QStringLiteral("client")
+      QStringLiteral("audio")
+    , QStringLiteral("client")
     , QStringLiteral("core")
     , QStringLiteral("daemon")
     , QStringLiteral("gui")
@@ -274,7 +284,13 @@ private:
   };
 
   inline static const QStringList m_validKeys = {
-      Client::DynamicConnectionRetry
+      Audio::Enabled
+    , Audio::Source
+    , Audio::CaptureDevice
+    , Audio::PlaybackDevice
+    , Audio::Bitrate
+    , Audio::FollowFocus
+    , Client::DynamicConnectionRetry
     , Client::InvertYScroll
     , Client::InvertXScroll
     , Client::LanguageSync
@@ -369,7 +385,9 @@ private:
 
   // When checking the default values this list contains the ones that default to true.
   inline static const QStringList m_defaultTrueValues = {
-      Core::UseHooks
+      Audio::Enabled
+    , Audio::FollowFocus
+    , Core::UseHooks
     , Gui::CloseToTray
     , Gui::CloseReminder
     , Gui::LogExpanded

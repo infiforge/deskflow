@@ -8,6 +8,7 @@
 
 #include "client/Client.h"
 
+#include "audio/AudioTypes.h"
 #include "arch/Arch.h"
 #include "base/IEventQueue.h"
 #include "base/Log.h"
@@ -61,6 +62,7 @@ Client::Client(
       m_socketFactory(socketFactory),
       m_computer(computer),
       m_events(events),
+      m_audioConfig(deskflow::audio::loadConfig()),
       m_useSecureNetwork(Settings::value(Settings::Security::TlsEnabled).toBool())
 {
   assert(m_socketFactory != nullptr);
@@ -69,12 +71,17 @@ Client::Client(
   // register suspend/resume event handlers
   m_events->addHandler(EventTypes::ComputerSuspend, getEventTarget(), [this](const auto &) { handleSuspend(); });
   m_events->addHandler(EventTypes::ComputerResume, getEventTarget(), [this](const auto &) { handleResume(); });
+  m_events->addHandler(EventTypes::AudioDataReady, getEventTarget(), [this](const auto &event) {
+    handleAudioData(event);
+  });
 }
 
 Client::~Client()
 {
+  stopAudio();
   m_events->removeHandler(EventTypes::ComputerSuspend, getEventTarget());
   m_events->removeHandler(EventTypes::ComputerResume, getEventTarget());
+  m_events->removeHandler(EventTypes::AudioDataReady, getEventTarget());
 
   cleanupTimer();
   cleanupComputer();
@@ -86,6 +93,42 @@ Client::~Client()
 void Client::setServerAddress(const NetworkAddress &address)
 {
   m_serverAddress = address;
+}
+
+void Client::startAudio()
+{
+  if (m_audioSender == nullptr) {
+    m_audioSender =
+        std::make_unique<deskflow::audio::AudioSender>(m_events, getEventTarget(), m_audioConfig, nullptr);
+  }
+  m_audioSender->start();
+}
+
+void Client::stopAudio()
+{
+  if (m_audioSender != nullptr) {
+    m_audioSender->stop();
+  }
+}
+
+void Client::handleAudioData(const Event &event)
+{
+  if (m_stream == nullptr) {
+    return;
+  }
+
+  const auto *audioEvent = dynamic_cast<const deskflow::audio::AudioDataEvent *>(event.getDataObject());
+  if (audioEvent == nullptr) {
+    return;
+  }
+
+  const auto &payload = audioEvent->data();
+  const uint32_t size = static_cast<uint32_t>(payload.size());
+  if (size == 0 || size > deskflow::audio::kMaxPacketSize) {
+    return;
+  }
+
+  ProtocolUtil::writef(m_stream, kMsgDAudioData, audioEvent->sequence(), &payload);
 }
 
 void Client::connect(size_t addressIndex)
@@ -613,6 +656,7 @@ void Client::handleOutputError()
 
 void Client::handleDisconnected()
 {
+  stopAudio();
   cleanupTimer();
   cleanupComputer();
   cleanupConnection();

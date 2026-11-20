@@ -574,6 +574,16 @@ void ServerProxy::grabClipboard()
   m_client->grabClipboard(id);
 }
 
+void ServerProxy::audioStart()
+{
+  m_client->startAudio();
+}
+
+void ServerProxy::audioStop()
+{
+  m_client->stopAudio();
+}
+
 void ServerProxy::keyDown(uint16_t id, uint16_t mask, uint16_t button, const std::string &lang)
 {
   flushCompressedMouse();

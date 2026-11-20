@@ -84,7 +84,7 @@ endif()
 #generate vcpkg file if needed
 if(WIN32)
     if(VCPKG_QT)
-        set(QT_LIBS ", \"qttranslations\", \"qtsvg\"")
+        set(QT_LIBS ", \"qttranslations\", \"qtsvg\", \"qt6-multimedia\"")
     endif()
     configure_file(cmake/vcpkg.json.in ${CMAKE_SOURCE_DIR}/vcpkg.json @ONLY)
 endif()
@@ -171,9 +171,21 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
 add_definitions(-DQT_NO_KEYWORDS)
 
 #Find and setup Qt
-find_package(Qt6 ${REQUIRED_QT_VERSION} REQUIRED COMPONENTS Core Widgets Network)
+find_package(Qt6 ${REQUIRED_QT_VERSION} REQUIRED COMPONENTS Core Widgets Network Multimedia)
 if(UNIX AND NOT APPLE)
     find_package(Qt6 ${REQUIRED_QT_VERSION} REQUIRED COMPONENTS DBus)
+endif()
+
+# Audio forwarding uses the Opus codec on all platforms. Prefer a CMake
+# package (vcpkg and Homebrew both provide one), and fall back to pkg-config.
+find_package(Opus QUIET)
+if(TARGET Opus::opus)
+  set(OPUS_LIBRARIES Opus::opus)
+elseif(TARGET opus)
+  set(OPUS_LIBRARIES opus)
+elseif(NOT OPUS_LIBRARIES)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(OPUS REQUIRED opus)
 endif()
 
 # Define the location of Qt deployment tool

@@ -1162,6 +1162,47 @@ extern const char *const kMsgDSecureInputNotification;
  */
 extern const char *const kMsgDLanguageSynchronisation;
 
+/**
+ * @brief Start audio forwarding
+ *
+ * **Message Code**: `"CAUD"`
+ * **Direction**: Server → Client
+ * **Format**: No parameters
+ *
+ * Sent to the active client to tell it to start capturing and sending audio.
+ * Clients that do not implement audio forwarding ignore this message.
+ *
+ * @since Protocol version 1.8
+ */
+extern const char *const kMsgCAudioStart;
+
+/**
+ * @brief Stop audio forwarding
+ *
+ * **Message Code**: `"CAUS"`
+ * **Direction**: Server → Client
+ * **Format**: No parameters
+ *
+ * Sent to the previously active client to stop capturing audio.
+ *
+ * @since Protocol version 1.8
+ */
+extern const char *const kMsgCAudioStop;
+
+/**
+ * @brief Encoded audio packet
+ *
+ * **Message Code**: `"DAUD"`
+ * **Direction**: Client → Server
+ * **Format**: `%4i%s` (sequence number, length-prefixed packet bytes)
+ *
+ * The packet contains a single Opus frame captured by the client. The server
+ * decodes and plays packets received from the active client only.
+ *
+ * @since Protocol version 1.8
+ */
+extern const char *const kMsgDAudioData;
+
 /** @} */ // end of protocol_system group
 
 /** @} */ // end of protocol_data group

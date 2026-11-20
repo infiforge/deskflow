@@ -238,5 +238,10 @@ enum class EventTypes : uint32_t
 
   /// Stop libei
   EISessionClosed,
+
+  /** This event is sent on the client when a captured audio packet is ready
+      to be written to the server. Event data is an AudioDataEvent.
+  */
+  AudioDataReady,
 };
 } // namespace deskflow

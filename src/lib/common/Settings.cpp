@@ -352,6 +352,12 @@ QVariant Settings::defaultValue(const QString &key)
   if (key == Server::ExternalConfigFile)
     return QStringLiteral("%1/%2-server.conf").arg(Settings::settingsPath(), kAppId);
 
+  if (key == Audio::Source)
+    return QStringLiteral("auto");
+
+  if (key == Audio::Bitrate)
+    return 64000;
+
   if (key == Core::Port)
     return 24800;
 

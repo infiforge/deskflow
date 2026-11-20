@@ -78,6 +78,18 @@ public:
   void setOptions(const OptionsList &options) override = 0;
   virtual void sendDragInfo(uint32_t fileCount, const char *info, size_t size) = 0;
   virtual void fileChunkSending(uint8_t mark, char *data, size_t dataSize) = 0;
+
+  //! Start audio forwarding on this client. Default no-op for proxies that
+  //! do not implement audio.
+  virtual void audioStart()
+  {
+  }
+
+  //! Stop audio forwarding on this client.
+  virtual void audioStop()
+  {
+  }
+
   virtual std::string getSecureInputApp() const = 0;
   virtual void secureInputNotification(const std::string &app) const = 0;
   std::string getName() const override;

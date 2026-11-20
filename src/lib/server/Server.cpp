@@ -53,6 +53,8 @@ Server::Server(ServerConfig &config, PrimaryClient *primaryClient, deskflow::Com
   assert(config.isComputer(primaryClient->getName()));
   assert(m_computer != nullptr);
 
+  m_audioConfig = deskflow::audio::loadConfig();
+
   std::string primaryName = getName(primaryClient);
 
   // clear clipboards
@@ -152,6 +154,10 @@ Server::Server(ServerConfig &config, PrimaryClient *primaryClient, deskflow::Com
 
 Server::~Server()
 {
+  if (m_audioReceiver != nullptr) {
+    m_audioReceiver->stop();
+  }
+
   // remove event handlers and timers
   using enum EventTypes;
   m_events->removeHandler(KeyStateKeyDown, m_inputFilter);
@@ -483,8 +489,22 @@ void Server::switchComputer(BaseClientProxy *dst, int32_t x, int32_t y, bool for
     }
 #endif
 
+    if (m_audioConfig.enabled && m_audioConfig.followFocus) {
+      // Stop audio from the computer we just left.
+      m_active->audioStop();
+      if (m_audioReceiver != nullptr) {
+        m_audioReceiver->stop();
+      }
+    }
+
     // cut over
     m_active = dst;
+
+    if (m_audioConfig.enabled && m_audioConfig.followFocus) {
+      // Audio follows the pointer: only the active client sends audio.
+      m_active->audioStart();
+      startAudioReceiver();
+    }
 
     // increment enter sequence number
     ++m_seqNum;
@@ -1437,6 +1457,45 @@ void Server::handleLockCursorToComputerEvent(const Event &event)
   }
 }
 
+void Server::onAudioData(const std::string &clientName, uint32_t sequence, const std::string &payload)
+{
+  if (!m_audioConfig.enabled) {
+    return;
+  }
+
+  if (m_audioConfig.followFocus) {
+    if (m_active == nullptr || m_active->getName() != clientName) {
+      // Ignore late packets from a client that no longer has focus.
+      return;
+    }
+  }
+
+  if (m_audioReceiver != nullptr) {
+    if (!m_audioConfig.followFocus && m_audioSource != clientName) {
+      m_audioReceiver->resetSequence();
+      m_audioSource = clientName;
+    }
+    m_audioReceiver->onPacket(sequence, payload);
+  }
+}
+
+void Server::startAudioReceiver()
+{
+  if (!m_audioConfig.enabled) {
+    return;
+  }
+
+  if (m_audioReceiver == nullptr) {
+    m_audioReceiver = std::make_unique<deskflow::audio::AudioReceiver>();
+  }
+  if (m_audioReceiver->start(m_audioConfig)) {
+    m_audioReceiverFailed = false;
+  } else if (!m_audioReceiverFailed) {
+    LOG_WARN("audio forwarding is enabled but no playback device could be opened");
+    m_audioReceiverFailed = true;
+  }
+}
+
 void Server::onClipboardChanged(const BaseClientProxy *sender, ClipboardID id, uint32_t seqNum)
 {
   ClipboardInfo &clipboard = m_clipboards[id];
@@ -1917,6 +1976,11 @@ bool Server::addClient(BaseClientProxy *client)
   // tell primary client about the active sides
   m_primaryClient->reconfigure(getActivePrimarySides());
 
+  if (m_audioConfig.enabled && !m_audioConfig.followFocus) {
+    client->audioStart();
+    startAudioReceiver();
+  }
+
   return true;
 }
 
@@ -1933,6 +1997,8 @@ bool Server::removeClient(BaseClientProxy *client)
   m_events->removeHandler(ComputerShapeChanged, client->getEventTarget());
   m_events->removeHandler(ClipboardGrabbed, client->getEventTarget());
   m_events->removeHandler(ClipboardChanged, client->getEventTarget());
+
+  client->audioStop();
 
   // remove from list
   m_clients.erase(getName(client));
@@ -2043,6 +2109,12 @@ void Server::forceLeaveClient(const BaseClientProxy *client)
     );
 
     // cut over
+    if (m_audioConfig.enabled && m_audioConfig.followFocus) {
+      m_active->audioStop();
+      if (m_audioReceiver != nullptr) {
+        m_audioReceiver->stop();
+      }
+    }
     m_active = m_primaryClient;
 
     // enter new computer (unless we already have because of the

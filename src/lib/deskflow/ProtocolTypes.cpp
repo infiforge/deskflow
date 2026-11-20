@@ -48,6 +48,15 @@ const char *const kMsgDFileTransfer = "DFTR%1i%s";
 const char *const kMsgDDragInfo = "DDRG%2i%s";
 const char *const kMsgDSecureInputNotification = "SECN%s";
 const char *const kMsgDLanguageSynchronisation = "LSYN%s";
+
+// Audio forwarding. The server sends CAUD/CAUS to the client whose screen is
+// active; the client sends Opus packets back using DAUD. The payload is a
+// length-prefixed string so ProtocolUtil can both write and read it with the
+// same %s specifier.
+const char *const kMsgCAudioStart = "CAUD";
+const char *const kMsgCAudioStop = "CAUS";
+const char *const kMsgDAudioData = "DAUD%4i%s";
+
 const char *const kMsgQInfo = "QINF";
 const char *const kMsgEIncompatible = "EICV%2i%2i";
 const char *const kMsgEBusy = "EBSY";

@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 add_subdirectory(arch)
+add_subdirectory(audio)
 add_subdirectory(base)
 add_subdirectory(client)
 add_subdirectory(common)

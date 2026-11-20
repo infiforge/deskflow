@@ -44,6 +44,38 @@ Option-value pairs are only written if the value is not the default value.
 option=value
 ```
 
+### Audio
+
+This section controls audio forwarding. It begins with `[audio]`. Audio forwarding is enabled by default.
+
+| Option          | Valid Values | Description |
+|:----------------|:------------:|:-----------|
+| enabled         | `true` or `false` | Enable audio forwarding [default: true] |
+| source          | `auto`, `system`, `microphone`, `device` | What a client captures [default: auto] |
+| captureDevice   | string | Input device name or PulseAudio source, used when source is `device` |
+| playbackDevice  | string | Output device name on the server. Empty selects the platform default |
+| bitrate         | 6000 - 512000 | Opus encoder bitrate in bits per second [default: 64000] |
+| followFocus     | `true` or `false` | Forward audio only from the focused client [default: true] |
+
+Every option can also be set with an environment variable. Environment variables take precedence over the settings file.
+
+| Environment variable | Option |
+|:---------------------|:-------|
+| `DESKFLOW_AUDIO_ENABLED` | enabled |
+| `DESKFLOW_AUDIO_SOURCE` | source |
+| `DESKFLOW_AUDIO_DEVICE` | captureDevice |
+| `DESKFLOW_AUDIO_PLAYBACK_DEVICE` | playbackDevice |
+| `DESKFLOW_AUDIO_BITRATE` | bitrate |
+| `DESKFLOW_AUDIO_FOLLOW_FOCUS` | followFocus |
+
+Capture backends are selected automatically:
+
+- Windows uses WASAPI loopback for `system` and `auto`, which captures application audio without a virtual device.
+- Linux uses the PulseAudio or PipeWire monitor of the default output. The `pactl` and `parec` tools must be on `PATH`.
+- macOS and other platforms use Qt Multimedia. Install a virtual audio device such as BlackHole, then set `source` to `device` and `captureDevice` to its name.
+
+Set `source` to `microphone` on any platform to forward microphone input instead of system audio. Setting `followFocus` to `false` makes every connected client forward audio continuously; the server plays the most recent packets it receives.
+
 ### Client
 
 This section contains options used when in client mode. 

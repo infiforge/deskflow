@@ -10,6 +10,7 @@
 
 #include "deskflow/IClient.h"
 
+#include "audio/AudioSender.h"
 #include "base/Event.h"
 #include "base/EventTypes.h"
 #include "common/Enums.h"
@@ -17,6 +18,7 @@
 #include "net/NetworkAddress.h"
 
 #include <climits>
+#include <memory>
 #include <string>
 
 class Event;
@@ -132,6 +134,12 @@ public:
   */
   virtual void handshakeComplete();
 
+  //! Start forwarding local audio to the server.
+  void startAudio();
+
+  //! Stop forwarding local audio to the server.
+  void stopAudio();
+
   //@}
   //! @name accessors
   //@{
@@ -216,6 +224,7 @@ private:
   void handleHello();
   void handleSuspend();
   void handleResume();
+  void handleAudioData(const Event &event);
   void sendClipboardThread(void *);
   void bindNetworkInterface(IDataSocket *socket) const;
 
@@ -236,6 +245,8 @@ private:
   IClipboard::Time m_timeClipboard[kClipboardEnd];
   std::string m_dataClipboard[kClipboardEnd];
   IEventQueue *m_events = nullptr;
+  std::unique_ptr<deskflow::audio::AudioSender> m_audioSender;
+  deskflow::audio::Config m_audioConfig;
   bool m_useSecureNetwork = false;
   bool m_enableClipboard = true;
   bool m_relativeMouseMoves = false;

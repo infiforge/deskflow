@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "audio/AudioConfig.h"
+#include "audio/AudioReceiver.h"
 #include "base/Event.h"
 #include "base/Stopwatch.h"
 #include "common/NetworkProtocol.h"
@@ -19,6 +21,7 @@
 
 #include <climits>
 #include <map>
+#include <memory>
 #include <set>
 #include <vector>
 
@@ -175,6 +178,17 @@ public:
   {
     m_clientListener = p;
   }
+
+  //! Handle an audio packet received from a client.
+  /*!
+   * With followFocus enabled, only packets from the focused client are played.
+   * Otherwise packets from any connected client are accepted. This is called
+   * by ClientProxy1_8 when a DAUD message arrives.
+   */
+  void onAudioData(const std::string &clientName, uint32_t sequence, const std::string &payload);
+
+  //! Open the playback device and start decoding incoming audio packets.
+  void startAudioReceiver();
 
   //@}
   //! @name accessors
@@ -399,6 +413,10 @@ private:
   deskflow::Computer *m_computer;
 
   IEventQueue *m_events = nullptr;
+  deskflow::audio::Config m_audioConfig;
+  std::unique_ptr<deskflow::audio::AudioReceiver> m_audioReceiver;
+  bool m_audioReceiverFailed = false;
+  std::string m_audioSource;
   size_t m_maximumClipboardSize = INT_MAX;
   ClientListener *m_clientListener = nullptr;
   Stopwatch m_switchTwoTapTimer;
