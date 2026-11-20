@@ -43,5 +43,6 @@ target_link_libraries(${lib_name}
 target_include_directories(${lib_name} PRIVATE ${OPUS_INCLUDE_DIRS})
 
 if(WIN32)
-  target_link_libraries(${lib_name} PUBLIC ole32 uuid)
+  # version.lib is needed by arch.lib (through base) for runtime version checks.
+  target_link_libraries(${lib_name} PUBLIC ole32 uuid version)
 endif()
