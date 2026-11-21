@@ -10,12 +10,12 @@
 #include "AudioConfig.h"
 #include "OpusCodec.h"
 
+#include <QByteArray>
 #include <QObject>
-#include <QTimer>
+#include <QThread>
 
 #include <cstdint>
 
-#include <cstdint>
 #include <deque>
 #include <memory>
 #include <mutex>
@@ -27,9 +27,12 @@ namespace deskflow::audio {
 
 //! Captures and encodes local audio, then posts packets to the client event queue.
 /*!
- * Capture may run on a platform thread, so encoded packets are queued under a
- * mutex and drained by a timer on the client's event thread. This keeps all
- * event queue and stream writes on the same thread.
+ * The Qt capture backends need a running Qt event loop for device changes and
+ * asynchronous process or audio input notifications. The core thread runs the
+ * Deskflow event queue instead of a Qt event loop, so the capture pipeline and
+ * its flush timer live on a dedicated worker thread with a real Qt event loop.
+ * Encoded packets are queued under a mutex and posted to the core event queue
+ * by the worker thread.
  */
 class AudioSender : public QObject
 {
@@ -40,31 +43,33 @@ public:
   AudioSender(const AudioSender &) = delete;
   AudioSender &operator=(const AudioSender &) = delete;
 
-  //! Begin capturing and sending audio.
+  //! Begin capturing and sending audio. Safe to call more than once.
   void start();
 
-  //! Stop capturing. Packets already queued are still delivered.
+  //! Stop capturing and release the audio device. Safe to call more than once.
   void stop();
 
   //! Test whether capture is active.
   bool isActive() const;
 
 private:
+  class Worker;
+
   void onPcmCaptured(const QByteArray &pcm);
   void flush();
 
   IEventQueue *m_events = nullptr;
   void *m_target = nullptr;
   Config m_config;
-  std::unique_ptr<AudioCapture> m_capture;
   OpusEncoderWrapper m_encoder;
   uint32_t m_sequence = 0;
   bool m_active = false;
-  qint64 m_lastRestartMs = 0;
+
+  QThread m_thread;
+  std::unique_ptr<Worker> m_worker;
 
   std::mutex m_queueMutex;
   std::deque<std::string> m_queue;
-  QTimer *m_flushTimer = nullptr;
 };
 
 } // namespace deskflow::audio

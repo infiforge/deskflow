@@ -10,6 +10,8 @@
 #include "AudioSink.h"
 #include "OpusCodec.h"
 
+#include <QThread>
+
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -17,6 +19,11 @@
 namespace deskflow::audio {
 
 //! Decodes Opus packets received from the active client and plays them locally.
+/*!
+ * Qt playback needs a running Qt event loop. The core thread runs the Deskflow
+ * event queue instead, so the sink and decoder live on a dedicated worker
+ * thread. The server posts packets to it with queued invocations.
+ */
 class AudioReceiver
 {
 public:
@@ -26,10 +33,10 @@ public:
   AudioReceiver(const AudioReceiver &) = delete;
   AudioReceiver &operator=(const AudioReceiver &) = delete;
 
-  //! Open the configured playback device.
+  //! Open the configured playback device. Safe to call more than once.
   bool start(const Config &config);
 
-  //! Close the playback device.
+  //! Close the playback device. Safe to call more than once.
   void stop();
 
   //! Decode and enqueue one packet from the active client.
@@ -40,9 +47,9 @@ public:
   void resetSequence();
 
 private:
-  std::unique_ptr<AudioSink> m_sink;
-  OpusDecoderWrapper m_decoder;
-  uint32_t m_expectedSequence = 0;
+  class Worker;
+  QThread m_thread;
+  std::unique_ptr<Worker> m_worker;
 };
 
 } // namespace deskflow::audio

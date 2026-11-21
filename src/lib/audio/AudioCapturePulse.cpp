@@ -188,7 +188,8 @@ private:
       return;
     }
 
-    m_frame.append(m_process->readAllStandardOutput());
+    const QByteArray chunk = m_process->readAllStandardOutput();
+    m_frame.append(chunk);
     while (m_frame.size() >= kFrameBytes) {
       const QByteArray pcm = m_frame.left(kFrameBytes);
       m_frame.remove(0, kFrameBytes);

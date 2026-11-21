@@ -6,13 +6,14 @@
 
 #pragma once
 
-#include "AudioBuffer.h"
 #include "AudioTypes.h"
 
 #include <QAudioFormat>
 #include <QAudioSink>
 #include <QByteArray>
 #include <QObject>
+
+class QIODevice;
 
 namespace deskflow::audio {
 
@@ -39,7 +40,7 @@ public:
 private:
   QAudioFormat m_format;
   QAudioSink *m_sink = nullptr;
-  AudioBuffer m_buffer;
+  QIODevice *m_ioDevice = nullptr;
 };
 
 } // namespace deskflow::audio

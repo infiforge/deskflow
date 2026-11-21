@@ -26,6 +26,13 @@ ServerProxy::ConnectionResult ServerProxy1_8::parseHandshakeMessage(const uint8_
   auto result = ConnectionResult::Okay;
   if (memcmp(code, kMsgDLanguageSynchronisation, 4) == 0) {
     setServerLayouts();
+  } else if (memcmp(code, kMsgCAudioStart, 4) == 0) {
+    // A patched server may start audio before it sends the options that
+    // complete the handshake. Accept it here as well so the connection is
+    // not torn down while the normal parser is still being installed.
+    audioStart();
+  } else if (memcmp(code, kMsgCAudioStop, 4) == 0) {
+    audioStop();
   } else {
     result = ServerProxy1_7::parseHandshakeMessage(code);
   }

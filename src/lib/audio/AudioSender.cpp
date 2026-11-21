@@ -13,10 +13,80 @@
 #include "base/Log.h"
 
 #include <QDateTime>
+#include <QTimer>
 
+#include <functional>
 #include <utility>
 
 namespace deskflow::audio {
+
+class AudioSender::Worker : public QObject
+{
+public:
+  using PcmCallback = std::function<void(const QByteArray &)>;
+  using FlushCallback = std::function<void()>;
+
+  Worker(Config config, PcmCallback onPcm, FlushCallback onFlush)
+      : m_config(std::move(config)), m_onPcmCaptured(std::move(onPcm)), m_onFlush(std::move(onFlush))
+  {
+  }
+
+  void start()
+  {
+    if (m_capture != nullptr) {
+      return;
+    }
+
+    m_capture = createAudioCapture(m_config);
+    if (m_capture == nullptr || !m_capture->start([this](const QByteArray &pcm) { m_onPcmCaptured(pcm); })) {
+      LOG_WARN("audio forwarding could not start: no usable capture device");
+      m_capture.reset();
+      return;
+    }
+
+    if (m_flushTimer == nullptr) {
+      m_flushTimer = new QTimer(this);
+      connect(m_flushTimer, &QTimer::timeout, this, &Worker::flush);
+    }
+    m_lastRestartMs = QDateTime::currentMSecsSinceEpoch();
+    m_flushTimer->start(kFrameDurationMs / 2);
+    LOG_INFO("audio forwarding started");
+  }
+
+  void stop()
+  {
+    if (m_flushTimer != nullptr) {
+      m_flushTimer->stop();
+    }
+    if (m_capture != nullptr) {
+      m_capture->stop();
+      m_capture.reset();
+    }
+  }
+
+private:
+  void flush()
+  {
+    if (m_capture != nullptr && !m_capture->isRunning()) {
+      const qint64 now = QDateTime::currentMSecsSinceEpoch();
+      if (now - m_lastRestartMs > 2000) {
+        m_lastRestartMs = now;
+        LOG_WARN("audio capture stopped unexpectedly; restarting");
+        stop();
+        start();
+      }
+      return;
+    }
+    m_onFlush();
+  }
+
+  Config m_config;
+  PcmCallback m_onPcmCaptured;
+  FlushCallback m_onFlush;
+  std::unique_ptr<AudioCapture> m_capture;
+  QTimer *m_flushTimer = nullptr;
+  qint64 m_lastRestartMs = 0;
+};
 
 AudioSender::AudioSender(IEventQueue *events, void *target, Config config, QObject *parent)
     : QObject(parent), m_events(events), m_target(target), m_config(std::move(config)),
@@ -26,7 +96,14 @@ AudioSender::AudioSender(IEventQueue *events, void *target, Config config, QObje
 
 AudioSender::~AudioSender()
 {
+  if (m_worker == nullptr) {
+    return;
+  }
+
   stop();
+  m_thread.quit();
+  m_thread.wait();
+  m_worker.reset();
 }
 
 void AudioSender::start()
@@ -35,43 +112,32 @@ void AudioSender::start()
     return;
   }
 
-  if (m_capture == nullptr) {
-    m_capture = createAudioCapture(m_config);
-  }
-  if (m_capture == nullptr) {
-    return;
+  if (!m_thread.isRunning()) {
+    m_thread.start();
   }
 
-  if (!m_capture->start([this](const QByteArray &pcm) { onPcmCaptured(pcm); })) {
-    LOG_WARN("audio forwarding could not start: no usable capture device");
-    return;
+  if (m_worker == nullptr) {
+    m_worker = std::make_unique<Worker>(
+        m_config, [this](const QByteArray &pcm) { onPcmCaptured(pcm); }, [this]() { flush(); });
+    m_worker->moveToThread(&m_thread);
   }
 
-  if (m_flushTimer == nullptr) {
-    m_flushTimer = new QTimer(this);
-    connect(m_flushTimer, &QTimer::timeout, this, &AudioSender::flush);
-  }
-  m_flushTimer->start(kFrameDurationMs / 2);
-
+  QMetaObject::invokeMethod(m_worker.get(), [this]() { m_worker->start(); }, Qt::QueuedConnection);
   m_active = true;
-  LOG_INFO("audio forwarding started");
 }
 
 void AudioSender::stop()
 {
-  if (!m_active && m_capture == nullptr) {
+  if (m_worker == nullptr || !m_active) {
     return;
   }
 
-  if (m_capture != nullptr) {
-    m_capture->stop();
-  }
-
-  if (m_flushTimer != nullptr) {
-    m_flushTimer->stop();
-  }
-
   m_active = false;
+  if (QThread::currentThread() == &m_thread) {
+    m_worker->stop();
+  } else {
+    QMetaObject::invokeMethod(m_worker.get(), [this]() { m_worker->stop(); }, Qt::BlockingQueuedConnection);
+  }
   LOG_INFO("audio forwarding stopped");
 }
 
@@ -86,30 +152,15 @@ void AudioSender::onPcmCaptured(const QByteArray &pcm)
     return;
   }
 
+  std::scoped_lock lock(m_queueMutex);
   const auto packet = m_encoder.encode(reinterpret_cast<const int16_t *>(pcm.constData()), kFrameSize);
-  if (packet.empty()) {
-    return;
-  }
-
-  {
-    std::scoped_lock lock(m_queueMutex);
+  if (!packet.empty()) {
     m_queue.push_back(packet);
   }
 }
 
 void AudioSender::flush()
 {
-  if (m_active && m_capture != nullptr && !m_capture->isRunning()) {
-    const qint64 now = QDateTime::currentMSecsSinceEpoch();
-    if (now - m_lastRestartMs > 2000) {
-      m_lastRestartMs = now;
-      LOG_WARN("audio capture stopped unexpectedly; restarting");
-      stop();
-      start();
-    }
-    return;
-  }
-
   std::deque<std::string> packets;
   {
     std::scoped_lock lock(m_queueMutex);

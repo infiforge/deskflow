@@ -9,6 +9,7 @@
 #include "base/Log.h"
 
 #include <QAudioDevice>
+#include <QIODevice>
 #include <QMediaDevices>
 
 namespace deskflow::audio {
@@ -75,9 +76,14 @@ bool AudioSink::start(const QString &deviceName)
   }
 
   m_sink = new QAudioSink(device, m_format, this);
+  m_ioDevice = m_sink->start();
+  if (m_ioDevice == nullptr) {
+    LOG_WARN("audio output device \"%s\" could not be opened", qPrintable(device.description()));
+    delete m_sink;
+    m_sink = nullptr;
+    return false;
+  }
 
-  m_buffer.clear();
-  m_sink->start(&m_buffer);
   return true;
 }
 
@@ -90,16 +96,16 @@ void AudioSink::stop()
   m_sink->stop();
   delete m_sink;
   m_sink = nullptr;
-  m_buffer.clear();
+  m_ioDevice = nullptr;
 }
 
 void AudioSink::write(const QByteArray &pcm)
 {
-  if (m_sink == nullptr || pcm.isEmpty()) {
+  if (m_ioDevice == nullptr || pcm.isEmpty()) {
     return;
   }
 
-  m_buffer.append(pcm.constData(), pcm.size());
+  m_ioDevice->write(pcm.constData(), pcm.size());
 }
 
 } // namespace deskflow::audio

@@ -279,6 +279,14 @@ void Server::adoptClient(BaseClientProxy *client)
   // send configuration options to client
   sendOptions(client);
 
+  // Audio start must follow the handshake: the client only installs its normal
+  // message parser after it receives the options above. Sending CAUD earlier
+  // makes older and patched clients reject it as an invalid handshake message.
+  if (m_audioConfig.enabled && !m_audioConfig.followFocus) {
+    client->audioStart();
+    startAudioReceiver();
+  }
+
   // activate computer saver on new client if active on the primary computer
   if (m_activeSaver != nullptr) {
     client->screensaver(true);
@@ -1975,11 +1983,6 @@ bool Server::addClient(BaseClientProxy *client)
 
   // tell primary client about the active sides
   m_primaryClient->reconfigure(getActivePrimarySides());
-
-  if (m_audioConfig.enabled && !m_audioConfig.followFocus) {
-    client->audioStart();
-    startAudioReceiver();
-  }
 
   return true;
 }
