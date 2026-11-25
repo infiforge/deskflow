@@ -14,8 +14,10 @@
 #include <ksmedia.h>
 #include <mmdeviceapi.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <thread>
 #include <utility>
@@ -92,6 +94,44 @@ private:
   AudioCapture::Callback m_callback;
   QByteArray m_frame;
 };
+
+double calculateBufferRms(const uint8_t *data, UINT32 frames, const WAVEFORMATEX *format)
+{
+  if (data == nullptr || frames == 0 || format == nullptr) {
+    return 0.0;
+  }
+
+  const bool isFloat = (format->wBitsPerSample == 32 &&
+                        (format->wFormatTag == WAVE_FORMAT_IEEE_FLOAT ||
+                         (format->wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
+                          reinterpret_cast<const WAVEFORMATEXTENSIBLE *>(format)->SubFormat ==
+                              KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)));
+  const int bytesPerSample = format->wBitsPerSample / 8;
+  const int channelCount = format->nChannels;
+  double sum = 0.0;
+  unsigned long long count = 0;
+
+  for (UINT32 frame = 0; frame < frames; ++frame) {
+    for (int channel = 0; channel < channelCount; ++channel) {
+      const size_t offset = static_cast<size_t>(frame) * channelCount * bytesPerSample +
+                            static_cast<size_t>(channel) * bytesPerSample;
+      double sample = 0.0;
+      if (isFloat) {
+        float value = 0.0f;
+        std::memcpy(&value, data + offset, sizeof(value));
+        sample = value;
+      } else if (bytesPerSample == 2) {
+        int16_t value = 0;
+        std::memcpy(&value, data + offset, sizeof(value));
+        sample = static_cast<double>(value) / 32768.0;
+      }
+      sum += sample * sample;
+      ++count;
+    }
+  }
+
+  return count > 0 ? std::sqrt(sum / static_cast<double>(count)) : 0.0;
+}
 
 class WasapiAudioCapture : public AudioCapture
 {
@@ -245,6 +285,11 @@ private:
   void captureLoop()
   {
     PcmAccumulator accumulator(m_callback);
+    unsigned long long totalFrames = 0;
+    unsigned long long nonSilentFrames = 0;
+    double lastRms = 0.0;
+    double peakRms = 0.0;
+    auto lastStatsLog = std::chrono::steady_clock::now();
 
     while (m_running.load()) {
       UINT32 packetSize = 0;
@@ -264,7 +309,13 @@ private:
           break;
         }
 
+        totalFrames += frames;
         if ((flags & AUDCLNT_BUFFERFLAGS_SILENT) == 0) {
+          nonSilentFrames += frames;
+          lastRms = calculateBufferRms(data, frames, m_format);
+          if (lastRms > peakRms) {
+            peakRms = lastRms;
+          }
           accumulator.append(data, frames, m_format);
         }
 
@@ -273,6 +324,13 @@ private:
         if (FAILED(m_captureClient->GetNextPacketSize(&packetSize))) {
           break;
         }
+      }
+
+      const auto now = std::chrono::steady_clock::now();
+      if (now - lastStatsLog >= std::chrono::seconds(2)) {
+        LOG_INFO("WASAPI loopback stats: totalFrames=%llu nonSilentFrames=%llu lastRms=%.6f peakRms=%.6f", totalFrames,
+                 nonSilentFrames, lastRms, peakRms);
+        lastStatsLog = now;
       }
 
       std::this_thread::sleep_for(std::chrono::milliseconds(kFrameDurationMs / 2));
