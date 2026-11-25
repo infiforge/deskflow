@@ -5,10 +5,16 @@
  */
 
 #include "AudioCapture.h"
+#include "AudioTypes.h"
 
 #include "base/Log.h"
 
+#include <atomic>
+#include <chrono>
+#include <cmath>
+#include <cstdint>
 #include <functional>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -61,12 +67,74 @@ private:
   std::unique_ptr<AudioCapture> m_current;
 };
 
+//! Generates a 440 Hz test tone for validating the transport without audio hardware.
+//! This backend is only enabled by DESKFLOW_AUDIO_TEST_TONE=1 and is never selected by default.
+class ToneAudioCapture final : public AudioCapture
+{
+public:
+  bool start(Callback callback) override
+  {
+    if (m_running.load()) {
+      return true;
+    }
+    m_callback = std::move(callback);
+    m_running.store(true);
+    m_thread = std::thread(&ToneAudioCapture::generate, this);
+    return true;
+  }
+
+  void stop() override
+  {
+    m_running.store(false);
+    if (m_thread.joinable()) {
+      m_thread.join();
+    }
+  }
+
+  bool isRunning() const override
+  {
+    return m_running.load() && m_thread.joinable();
+  }
+
+private:
+  void generate()
+  {
+    constexpr double kPi = 3.14159265358979323846;
+    constexpr double kFrequency = 440.0;
+    int frameIndex = 0;
+
+    while (m_running.load()) {
+      QByteArray pcm(kFrameBytes, '\0');
+      auto *samples = reinterpret_cast<int16_t *>(pcm.data());
+      const int startSample = frameIndex * kFrameSize;
+      for (int i = 0; i < kFrameSize; ++i) {
+        const double phase = 2.0 * kPi * kFrequency * (startSample + i) / kSampleRate;
+        const int16_t value = static_cast<int16_t>(std::sin(phase) * 12000.0);
+        samples[i * kChannels] = value;
+        samples[i * kChannels + 1] = value;
+      }
+      m_callback(pcm);
+      ++frameIndex;
+      std::this_thread::sleep_for(std::chrono::milliseconds(kFrameDurationMs));
+    }
+  }
+
+  std::atomic<bool> m_running{false};
+  Callback m_callback;
+  std::thread m_thread;
+};
+
 } // namespace
 
 std::unique_ptr<AudioCapture> createAudioCapture(const Config &config)
 {
   auto fallback = std::make_unique<FallbackAudioCapture>();
   if (!config.enabled) {
+    return fallback;
+  }
+
+  if (qEnvironmentVariableIntValue("DESKFLOW_AUDIO_TEST_TONE") == 1) {
+    fallback->add([] { return std::make_unique<ToneAudioCapture>(); });
     return fallback;
   }
 

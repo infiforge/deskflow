@@ -26,6 +26,10 @@ namespace {
 
 constexpr REFERENCE_TIME kBufferDuration = 10000000; // 1 second, in 100ns units
 
+// DEVICE_STATE_ALL is not declared by every Windows SDK version. The WASAPI
+// state flags are active, disabled, not present, and unplugged.
+constexpr DWORD kDeviceStateAll = 0x0F;
+
 //! Convert a WASAPI buffer to interleaved 16-bit PCM frames and emit them.
 class PcmAccumulator
 {
@@ -116,29 +120,42 @@ public:
 
     IMMDevice *device = nullptr;
     hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
+    if (SUCCEEDED(hr)) {
+      if (!initializeDevice(device)) {
+        hr = E_FAIL;
+      }
+      device->Release();
+    } else {
+      // Headless and remote sessions may have no default render endpoint even
+      // when render devices exist. Try every render device, including those
+      // reported as unplugged, so loopback capture can still work.
+      IMMDeviceCollection *devices = nullptr;
+      hr = enumerator->EnumAudioEndpoints(eRender, kDeviceStateAll, &devices);
+      if (SUCCEEDED(hr)) {
+        UINT count = 0;
+        hr = devices->GetCount(&count);
+        if (SUCCEEDED(hr) && count > 0) {
+          hr = E_FAIL;
+        }
+        for (UINT i = 0; i < count && FAILED(hr); ++i) {
+          IMMDevice *candidate = nullptr;
+          const HRESULT itemResult = devices->Item(i, &candidate);
+          if (FAILED(itemResult) || candidate == nullptr) {
+            continue;
+          }
+          if (initializeDevice(candidate)) {
+            hr = S_OK;
+          } else {
+            hr = E_FAIL;
+          }
+          candidate->Release();
+        }
+        devices->Release();
+      }
+    }
     enumerator->Release();
     if (FAILED(hr)) {
-      LOG_ERR("failed to get default WASAPI render endpoint: 0x%08lx", hr);
-      return false;
-    }
-
-    hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, reinterpret_cast<void **>(&m_client));
-    device->Release();
-    if (FAILED(hr)) {
-      LOG_ERR("failed to activate WASAPI audio client: 0x%08lx", hr);
-      return false;
-    }
-
-    hr = m_client->GetMixFormat(&m_format);
-    if (FAILED(hr)) {
-      LOG_ERR("failed to get WASAPI mix format: 0x%08lx", hr);
-      return false;
-    }
-
-    hr = m_client->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK, kBufferDuration, 0, m_format,
-                              nullptr);
-    if (FAILED(hr)) {
-      LOG_ERR("failed to initialize WASAPI loopback capture: 0x%08lx", hr);
+      LOG_ERR("failed to get a usable WASAPI render endpoint: 0x%08lx", hr);
       return false;
     }
 
@@ -194,6 +211,37 @@ public:
   }
 
 private:
+  bool initializeDevice(IMMDevice *device)
+  {
+    IAudioClient *client = nullptr;
+    HRESULT hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, reinterpret_cast<void **>(&client));
+    if (FAILED(hr)) {
+      LOG_WARN("WASAPI render device could not be activated: 0x%08lx", hr);
+      return false;
+    }
+
+    WAVEFORMATEX *format = nullptr;
+    hr = client->GetMixFormat(&format);
+    if (FAILED(hr)) {
+      LOG_WARN("WASAPI mix format is unavailable: 0x%08lx", hr);
+      client->Release();
+      return false;
+    }
+
+    hr = client->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK, kBufferDuration, 0, format,
+                            nullptr);
+    if (FAILED(hr)) {
+      LOG_WARN("WASAPI loopback capture could not start on this device: 0x%08lx", hr);
+      CoTaskMemFree(format);
+      client->Release();
+      return false;
+    }
+
+    m_client = client;
+    m_format = format;
+    return true;
+  }
+
   void captureLoop()
   {
     PcmAccumulator accumulator(m_callback);
