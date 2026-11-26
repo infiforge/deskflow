@@ -37,19 +37,21 @@ public:
       return;
     }
 
-    m_capture = createAudioCapture(m_config);
-    if (m_capture == nullptr || !m_capture->start([this](const QByteArray &pcm) { m_onPcmCaptured(pcm); })) {
-      LOG_WARN("audio forwarding could not start: no usable capture device");
-      m_capture.reset();
-      return;
-    }
-
     if (m_flushTimer == nullptr) {
       m_flushTimer = new QTimer(this);
       connect(m_flushTimer, &QTimer::timeout, this, &Worker::flush);
     }
-    m_lastRestartMs = QDateTime::currentMSecsSinceEpoch();
     m_flushTimer->start(kFrameDurationMs / 2);
+
+    m_capture = createAudioCapture(m_config);
+    if (m_capture == nullptr || !m_capture->start([this](const QByteArray &pcm) { m_onPcmCaptured(pcm); })) {
+      LOG_WARN("audio forwarding could not start: no usable capture device");
+      m_capture.reset();
+      m_lastRestartMs = QDateTime::currentMSecsSinceEpoch();
+      return;
+    }
+
+    m_lastRestartMs = QDateTime::currentMSecsSinceEpoch();
     LOG_INFO("audio forwarding started");
   }
 
@@ -67,7 +69,18 @@ public:
 private:
   void flush()
   {
-    if (m_capture != nullptr && !m_capture->isRunning()) {
+    if (m_capture == nullptr) {
+      const qint64 now = QDateTime::currentMSecsSinceEpoch();
+      if (now - m_lastRestartMs > 2000) {
+        m_lastRestartMs = now;
+        LOG_WARN("audio capture retrying after a startup failure");
+        start();
+      }
+      m_onFlush();
+      return;
+    }
+
+    if (!m_capture->isRunning()) {
       const qint64 now = QDateTime::currentMSecsSinceEpoch();
       if (now - m_lastRestartMs > 2000) {
         m_lastRestartMs = now;

@@ -111,4 +111,40 @@ void SettingsTests::checkClearState()
   QVERIFY(!Settings::value(Settings::Gui::WindowGeometry).toRect().isValid());
 }
 
+void SettingsTests::audioDefaultsAndRoundTrip()
+{
+  QCOMPARE(Settings::defaultValue(Settings::Audio::MuteMode).toString(), QStringLiteral("off"));
+  QCOMPARE(Settings::defaultValue(Settings::Audio::StreamVolume).toInt(), 100);
+  QCOMPARE(Settings::defaultValue(Settings::Audio::StreamBalance).toInt(), 0);
+  QVERIFY(!Settings::defaultValue(Settings::Audio::ControlSystemOutput).toBool());
+  QCOMPARE(Settings::defaultValue(Settings::Audio::SystemVolume).toInt(), 100);
+  QCOMPARE(Settings::defaultValue(Settings::Audio::SystemBalance).toInt(), 0);
+
+  const auto keys = Settings::validKeys();
+  QVERIFY(keys.contains(Settings::Audio::MuteMode));
+  QVERIFY(keys.contains(Settings::Audio::StreamVolume));
+  QVERIFY(keys.contains(Settings::Audio::StreamBalance));
+  QVERIFY(keys.contains(Settings::Audio::ControlSystemOutput));
+  QVERIFY(keys.contains(Settings::Audio::SystemVolume));
+  QVERIFY(keys.contains(Settings::Audio::SystemBalance));
+
+  Settings::setValue(Settings::Audio::MuteMode, QStringLiteral("apps"));
+  Settings::setValue(Settings::Audio::StreamVolume, 55);
+  Settings::setValue(Settings::Audio::StreamBalance, -30);
+  Settings::setValue(Settings::Audio::ControlSystemOutput, true);
+  Settings::setValue(Settings::Audio::SystemVolume, 80);
+  Settings::setValue(Settings::Audio::SystemBalance, 25);
+  Settings::save(false);
+
+  QCOMPARE(Settings::value(Settings::Audio::MuteMode).toString(), QStringLiteral("apps"));
+  QCOMPARE(Settings::value(Settings::Audio::StreamVolume).toInt(), 55);
+  QCOMPARE(Settings::value(Settings::Audio::StreamBalance).toInt(), -30);
+  QVERIFY(Settings::value(Settings::Audio::ControlSystemOutput).toBool());
+  QCOMPARE(Settings::value(Settings::Audio::SystemVolume).toInt(), 80);
+  QCOMPARE(Settings::value(Settings::Audio::SystemBalance).toInt(), 25);
+
+  Settings::restoreDefaultSettings();
+  QCOMPARE(Settings::value(Settings::Audio::MuteMode).toString(), QStringLiteral("off"));
+}
+
 QTEST_MAIN(SettingsTests)

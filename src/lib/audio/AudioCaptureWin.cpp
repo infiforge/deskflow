@@ -293,7 +293,10 @@ private:
 
     while (m_running.load()) {
       UINT32 packetSize = 0;
-      if (FAILED(m_captureClient->GetNextPacketSize(&packetSize))) {
+      HRESULT hr = m_captureClient->GetNextPacketSize(&packetSize);
+      if (FAILED(hr)) {
+        LOG_WARN("WASAPI loopback stopped: GetNextPacketSize failed: 0x%08lx", hr);
+        m_running.store(false);
         break;
       }
 
@@ -304,8 +307,10 @@ private:
         UINT64 devicePosition = 0;
         UINT64 qpcPosition = 0;
 
-        HRESULT hr = m_captureClient->GetBuffer(&data, &frames, &flags, &devicePosition, &qpcPosition);
+        hr = m_captureClient->GetBuffer(&data, &frames, &flags, &devicePosition, &qpcPosition);
         if (FAILED(hr)) {
+          LOG_WARN("WASAPI loopback stopped: GetBuffer failed: 0x%08lx", hr);
+          m_running.store(false);
           break;
         }
 
@@ -321,7 +326,10 @@ private:
 
         m_captureClient->ReleaseBuffer(frames);
 
-        if (FAILED(m_captureClient->GetNextPacketSize(&packetSize))) {
+        hr = m_captureClient->GetNextPacketSize(&packetSize);
+        if (FAILED(hr)) {
+          LOG_WARN("WASAPI loopback stopped: GetNextPacketSize failed: 0x%08lx", hr);
+          m_running.store(false);
           break;
         }
       }
